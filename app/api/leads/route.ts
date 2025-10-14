@@ -1,17 +1,44 @@
+// app/api/leads/route.ts
+
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { auth } from '@/lib/auth'; // Importamos o auth para pegar a sessão
 
-// Instancia o Prisma Client
 const prisma = new PrismaClient();
 
-export async function POST(request: Request) {
-  // Usamos um bloco try...catch para lidar com possíveis erros
-  try {
-    // Pega o corpo (body) da requisição que o n8n vai enviar
-    const body = await request.json();
+// Handler para GET - Listar Leads
+export async function GET(request: Request) {
+  const session = await auth();
 
-    // Extrai os campos do corpo da requisição
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+
+  try {
+    const leads = await prisma.lead.findMany({
+      where: {
+        userId: session.user.id,
+      },
+      orderBy: {
+        createdAt: 'desc', // Mostra os mais recentes primeiro
+      },
+    });
+    return NextResponse.json(leads);
+  } catch (error) {
+    console.error("Erro ao buscar leads:", error);
+    return NextResponse.json(
+      { error: 'Ocorreu um erro ao buscar os leads.' },
+      { status: 500 }
+    );
+  }
+}
+
+// Handler para POST - Criar/Atualizar Lead (já existente)
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
     const {
+      userId,
       nome,
       contato,
       produtoDeInteresse,
@@ -23,11 +50,23 @@ export async function POST(request: Request) {
       historicoCompleto,
     } = body;
 
-    // Cria um novo registro de lead no banco de dados
-    const newLead = await prisma.lead.create({
-      data: {
+    if (!userId || !nome || !contato) {
+      return NextResponse.json(
+        { error: 'userId, nome e contato são obrigatórios.' },
+        { status: 400 }
+      );
+    }
+    
+    // Procura por um usuário com o `userId` para garantir que ele existe
+    const userExists = await prisma.user.findUnique({ where: { id: userId }});
+    if (!userExists) {
+        return NextResponse.json({ error: 'Usuário especialista não encontrado.' }, { status: 404 });
+    }
+
+    const lead = await prisma.lead.upsert({
+      where: { contato: contato },
+      update: {
         nome,
-        contato,
         produtoDeInteresse,
         necessidadePrincipal,
         orcamento,
@@ -35,17 +74,19 @@ export async function POST(request: Request) {
         classificacao,
         resumoDaConversa,
         historicoCompleto,
+        status: 'QUALIFICADO',
+      },
+      create: {
+        nome,
+        contato,
+        userId,
       },
     });
 
-    // Retorna o lead que acabamos de criar com o status HTTP 201 (Created)
-    return NextResponse.json(newLead, { status: 201 });
+    return NextResponse.json(lead, { status: 201 });
 
   } catch (error) {
-    // Se ocorrer um erro, imprime no console do servidor para debug
-    console.error("Erro ao criar o lead:", error);
-    
-    // E retorna uma mensagem de erro genérica com status HTTP 500
+    console.error("Erro ao criar ou atualizar o lead:", error);
     return NextResponse.json(
       { error: 'Ocorreu um erro ao processar a requisição.' },
       { status: 500 }

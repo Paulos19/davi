@@ -1,5 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -10,17 +9,53 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Novo modelo para o Especialista/Usuário
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String // Armazenaremos o hash da senha, não a senha em texto plano
+  phone     String   @unique // Identificador para receber atualizações do n8n
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relação: Um usuário pode ter muitos leads
+  leads Lead[]
+}
+
+// Modelo de Lead atualizado
 model Lead {
   id                 String   @id @default(cuid())
+  status             LeadStatus @default(ENTRANTE) // Status do lead no funil
   nome               String
-  contato            String
-  produtoDeInteresse String
-  necessidadePrincipal String
-  orcamento          String
-  prazo              String
-  classificacao      String 
-  resumoDaConversa   String   @db.Text
-  historicoCompleto  Json
+  contato            String   @unique // Contato do cliente
+  produtoDeInteresse String? // Opcional no início
+  necessidadePrincipal String? // Opcional no início
+  orcamento          String? // Opcional no início
+  prazo              String? // Opcional no início
+  classificacao      String?  // Opcional no início
+  resumoDaConversa   String?  @db.Text // Opcional no início
+  historicoCompleto  Json?    // Opcional no início
+
+  // Novos campos a serem preenchidos pelo especialista
+  faturamentoEstimado String?
+  atividadePrincipal  String?
+  vendaRealizada     Boolean  @default(false)
+  valorVenda         Float?
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  // Chave estrangeira para o especialista
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+// Enum para os status do Lead
+enum LeadStatus {
+  ENTRANTE
+  QUALIFICADO
+  ATENDIDO
+  VENDA_REALIZADA
+  PERDIDO
 }
