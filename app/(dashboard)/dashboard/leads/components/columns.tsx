@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner" // 1. Importado
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+// Helper para mapear status para variantes de cor do Badge
 const statusVariant: { [key in LeadStatus]: "default" | "secondary" | "destructive" | "outline" } = {
     ENTRANTE: "secondary",
     QUALIFICADO: "default",
@@ -27,22 +29,30 @@ const statusVariant: { [key in LeadStatus]: "default" | "secondary" | "destructi
     PERDIDO: "destructive",
 }
 
-// Componente funcional interno para poder usar hooks
+// Componente funcional interno para poder usar hooks (useRouter)
 const ActionsCell = ({ lead }: { lead: Lead }) => {
     const router = useRouter();
 
     const updateLeadStatus = async (status: LeadStatus) => {
         try {
-            await fetch(`/api/leads/${lead.id}`, {
+            const response = await fetch(`/api/leads/${lead.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status }),
             });
-            // Recarrega os dados da página para refletir a mudança
+
+            if (!response.ok) {
+                throw new Error('Falha ao atualizar o status do lead.');
+            }
+            
+            // 2. Notificação de sucesso adicionada
+            toast.success(`Status do lead alterado para "${status.replace("_", " ")}"`);
+            
             router.refresh(); 
         } catch (error) {
             console.error("Falha ao atualizar status:", error);
-            // Adicionar feedback para o usuário aqui (ex: um toast)
+            // 3. Notificação de erro adicionada
+            toast.error("Ocorreu um erro ao atualizar o status.");
         }
     };
     
@@ -56,6 +66,9 @@ const ActionsCell = ({ lead }: { lead: Lead }) => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => router.push(`/dashboard/leads/${lead.id}`)}>
+              Ver detalhes
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigator.clipboard.writeText(lead.contato)}>
               Copiar contato
             </DropdownMenuItem>
@@ -63,6 +76,8 @@ const ActionsCell = ({ lead }: { lead: Lead }) => {
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Alterar Status</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
+                <DropdownMenuLabel>Definir como:</DropdownMenuLabel>
+                <DropdownMenuSeparator />
                 {Object.values(LeadStatus).map((status) => (
                   <DropdownMenuItem key={status} onSelect={() => updateLeadStatus(status)}>
                     {status.replace("_", " ")}
@@ -70,13 +85,12 @@ const ActionsCell = ({ lead }: { lead: Lead }) => {
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuItem disabled>Ver detalhes</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
     )
 }
 
-
+// Definição das colunas para a tabela de dados
 export const columns: ColumnDef<Lead>[] = [
   {
     accessorKey: "nome",
@@ -91,12 +105,14 @@ export const columns: ColumnDef<Lead>[] = [
     header: "Status",
     cell: ({ row }) => {
       const status = row.getValue("status") as LeadStatus;
-      return <Badge 
-              variant={statusVariant[status]}
-              className={status === 'VENDA_REALIZADA' ? 'bg-green-500 hover:bg-green-600 text-white' : ''}
-            >
-              {status.replace("_", " ")}
-            </Badge>
+      return (
+        <Badge 
+          variant={statusVariant[status]}
+          className={status === 'VENDA_REALIZADA' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+        >
+          {status.replace("_", " ")}
+        </Badge>
+      );
     },
   },
   {

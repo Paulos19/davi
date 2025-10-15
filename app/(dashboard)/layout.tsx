@@ -12,11 +12,14 @@ export default async function DashboardLayout({
   const session = await auth();
 
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[auto_1fr] lg:grid-cols-[auto_1fr]">
+    // 1. Trocamos 'grid' por 'flex' para ter um layout fluido
+    <div className="flex min-h-screen w-full">
       <Sidebar />
-      <div className="flex flex-col">
+      {/* 2. Este div agora agrupa o cabeçalho e o conteúdo principal */}
+      <div className="flex flex-1 flex-col">
         <Header user={session?.user} />
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-muted/40">
+        {/* 3. O 'main' agora é a única área com scroll vertical */}
+        <main className="flex-1 overflow-y-auto bg-muted/40 p-4 md:gap-8 md:p-8">
           {children}
         </main>
       </div>
