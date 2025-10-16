@@ -2,38 +2,29 @@
 
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { auth } from '@/lib/auth'; // Importamos o auth para pegar a sessão
+import { auth } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
 // Handler para GET - Listar Leads
 export async function GET(request: Request) {
   const session = await auth();
-
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
-
   try {
     const leads = await prisma.lead.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      orderBy: {
-        createdAt: 'desc', // Mostra os mais recentes primeiro
-      },
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json(leads);
   } catch (error) {
     console.error("Erro ao buscar leads:", error);
-    return NextResponse.json(
-      { error: 'Ocorreu um erro ao buscar os leads.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Ocorreu um erro ao buscar os leads.' }, { status: 500 });
   }
 }
 
-// Handler para POST - Criar/Atualizar Lead (já existente)
+// Handler para POST - Criar/Atualizar Lead
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -51,21 +42,17 @@ export async function POST(request: Request) {
     } = body;
 
     if (!userId || !nome || !contato) {
-      return NextResponse.json(
-        { error: 'userId, nome e contato são obrigatórios.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'userId, nome e contato são obrigatórios.' }, { status: 400 });
     }
     
-    // Procura por um usuário com o `userId` para garantir que ele existe
     const userExists = await prisma.user.findUnique({ where: { id: userId }});
     if (!userExists) {
-        return NextResponse.json({ error: 'Usuário especialista não encontrado.' }, { status: 404 });
+      return NextResponse.json({ error: 'Usuário especialista não encontrado.' }, { status: 404 });
     }
 
     const lead = await prisma.lead.upsert({
       where: { contato: contato },
-      update: {
+      update: { // Se já existe, atualiza tudo e define como QUALIFICADO
         nome,
         produtoDeInteresse,
         necessidadePrincipal,
@@ -76,10 +63,18 @@ export async function POST(request: Request) {
         historicoCompleto,
         status: 'QUALIFICADO',
       },
-      create: {
+      create: { // Se não existe, cria com todos os dados e define como QUALIFICADO
+        userId,
         nome,
         contato,
-        userId,
+        produtoDeInteresse,
+        necessidadePrincipal,
+        orcamento,
+        prazo,
+        classificacao,
+        resumoDaConversa,
+        historicoCompleto,
+        status: 'QUALIFICADO', // Define o status correto na criação
       },
     });
 
@@ -87,9 +82,6 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error("Erro ao criar ou atualizar o lead:", error);
-    return NextResponse.json(
-      { error: 'Ocorreu um erro ao processar a requisição.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Ocorreu um erro ao processar a requisição.' }, { status: 500 });
   }
 }

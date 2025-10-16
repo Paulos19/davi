@@ -4,55 +4,53 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2 } from 'lucide-react';
-import { toast } from 'sonner'; // 1. Importado
+import { Download, Loader2, FileText, FileSpreadsheet } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ExportPage() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingFormat, setLoadingFormat] = useState<'csv' | 'xlsx' | null>(null);
 
-  const handleDownload = async () => {
-    setIsLoading(true);
+  const handleDownload = async (format: 'csv' | 'xlsx') => {
+    setLoadingFormat(format);
 
-    // 2. Usando toast.promise para gerir os estados
-    const promise = fetch('/api/export');
+    const promise = fetch(`/api/export?format=${format}`);
 
     toast.promise(promise, {
-      loading: 'A gerar o seu ficheiro CSV...',
-      success: (response) => {
+      loading: `A gerar o seu ficheiro ${format.toUpperCase()}...`,
+      success: async (response) => {
         if (!response.ok) {
-          throw new Error('Falha na resposta do servidor.');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Falha na resposta do servidor.');
+        }
+
+        if (response.status === 204) {
+          return "Nenhum lead para exportar.";
         }
         
-        // Lógica de download movida para o 'success'
-        response.blob().then(blob => {
-          if (blob.size === 0) {
-            throw new Error("Nenhum dado para exportar.");
-          }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
 
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-
-          const disposition = response.headers.get('content-disposition');
-          let filename = `leads_davi_${new Date().toISOString().split('T')[0]}.csv`;
-          if (disposition && disposition.includes('attachment')) {
+        const disposition = response.headers.get('content-disposition');
+        let filename = `leads.${format}`;
+        if (disposition && disposition.includes('attachment')) {
             const filenameMatch = /filename="?([^"]+)"?/.exec(disposition);
-            if (filenameMatch && filenameMatch[1]) {
-              filename = filenameMatch[1];
+            if (filenameMatch?.[1]) {
+                filename = filenameMatch[1];
             }
-          }
-
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
-        });
-
-        return 'O seu download irá começar em breve!';
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+a.click();
+a.remove();
+        window.URL.revokeObjectURL(url);
+        
+        return `O seu ficheiro ${format.toUpperCase()} foi descarregado!`;
       },
       error: (err) => err.message || 'Ocorreu um erro ao gerar o ficheiro.',
-      finally: () => setIsLoading(false),
+      finally: () => setLoadingFormat(null),
     });
   };
 
@@ -62,24 +60,37 @@ export default function ExportPage() {
         <CardHeader>
           <CardTitle>Exportar Dados Brutos</CardTitle>
           <CardDescription>
-            Faça o download de todos os dados dos seus leads em formato CSV para
-            análise em planilhas ou outras ferramentas.
+            Faça o download de todos os dados dos seus leads. Escolha o formato desejado abaixo.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex w-full justify-center">
-            <Button onClick={handleDownload} disabled={isLoading} size="lg">
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  A gerar...
-                </>
+          <div className="flex w-full justify-center gap-4">
+            {/* Botão CSV */}
+            <Button 
+              onClick={() => handleDownload('csv')} 
+              disabled={!!loadingFormat} 
+              size="lg"
+            >
+              {loadingFormat === 'csv' ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" />
-                  Descarregar Ficheiro CSV
-                </>
+                <FileText className="mr-2 h-4 w-4" />
               )}
+              Exportar para CSV
+            </Button>
+            
+            {/* Botão XLSX */}
+            <Button 
+              onClick={() => handleDownload('xlsx')} 
+              disabled={!!loadingFormat} 
+              size="lg"
+            >
+              {loadingFormat === 'xlsx' ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+              )}
+              Exportar para XLSX (Excel)
             </Button>
           </div>
         </CardContent>
