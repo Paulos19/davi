@@ -20,35 +20,55 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relação: Um usuário pode ter muitos leads
-  leads Lead[]
+  leads        Lead[]
+  agendamentos Agendamento[]
 }
 
-// Modelo de Lead atualizado
 model Lead {
-  id                 String   @id @default(cuid())
-  status             LeadStatus @default(ENTRANTE) // Status do lead no funil
-  nome               String
-  contato            String   @unique // Contato do cliente
-  produtoDeInteresse String? // Opcional no início
-  necessidadePrincipal String? // Opcional no início
-  orcamento          String? // Opcional no início
-  prazo              String? // Opcional no início
-  classificacao      String?  // Opcional no início
-  resumoDaConversa   String?  @db.Text // Opcional no início
-  historicoCompleto  Json?    // Opcional no início
+  id      String     @id @default(cuid())
+  status  LeadStatus @default(ENTRANTE)
+  nome    String
+  contato String     @unique
 
-  // Novos campos a serem preenchidos pelo especialista
+  produtoDeInteresse   String?
+  necessidadePrincipal String?
+  orcamento            String?
+  prazo                String?
+  classificacao        String?
+
   faturamentoEstimado String?
-  atividadePrincipal  String?
-  vendaRealizada     Boolean  @default(false)
+  segmentacao         String?
+
+  resumoDaConversa  String? @db.Text
+  historicoCompleto Json?
+
+  atividadePrincipal String?
+  vendaRealizada     Boolean @default(false)
   valorVenda         Float?
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  // Chave estrangeira para o especialista
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  agendamento Agendamento?
+}
+
+model Agendamento {
+  id       String   @id @default(cuid())
+  dataHora DateTime
+  tipo     String
+  status   String   @default("PENDENTE")
+  resumo   String?  @db.Text
+
+  leadId String @unique
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
   userId String
   user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Enum para os status do Lead

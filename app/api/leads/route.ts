@@ -24,7 +24,6 @@ export async function GET(request: Request) {
   }
 }
 
-// Handler para POST - Criar/Atualizar Lead
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -39,20 +38,26 @@ export async function POST(request: Request) {
       classificacao,
       resumoDaConversa,
       historicoCompleto,
+      // Novos campos recebidos do n8n
+      faturamentoEstimado, 
+      segmentacao 
     } = body;
 
+    // Validação básica
     if (!userId || !nome || !contato) {
       return NextResponse.json({ error: 'userId, nome e contato são obrigatórios.' }, { status: 400 });
     }
     
+    // Verifica se o especialista existe
     const userExists = await prisma.user.findUnique({ where: { id: userId }});
     if (!userExists) {
       return NextResponse.json({ error: 'Usuário especialista não encontrado.' }, { status: 404 });
     }
 
+    // Upsert (Cria ou Atualiza)
     const lead = await prisma.lead.upsert({
       where: { contato: contato },
-      update: { // Se já existe, atualiza tudo e define como QUALIFICADO
+      update: { 
         nome,
         produtoDeInteresse,
         necessidadePrincipal,
@@ -62,8 +67,11 @@ export async function POST(request: Request) {
         resumoDaConversa,
         historicoCompleto,
         status: 'QUALIFICADO',
+        // Atualiza novos campos
+        faturamentoEstimado,
+        segmentacao
       },
-      create: { // Se não existe, cria com todos os dados e define como QUALIFICADO
+      create: { 
         userId,
         nome,
         contato,
@@ -74,7 +82,10 @@ export async function POST(request: Request) {
         classificacao,
         resumoDaConversa,
         historicoCompleto,
-        status: 'QUALIFICADO', // Define o status correto na criação
+        status: 'QUALIFICADO',
+        // Insere novos campos
+        faturamentoEstimado,
+        segmentacao
       },
     });
 
