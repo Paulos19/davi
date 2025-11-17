@@ -59,3 +59,14 @@ enum LeadStatus {
   VENDA_REALIZADA
   PERDIDO
 }
+
+model WaitListEntry {
+  id               String   @id @default(cuid())
+  patientName      String
+  patientBirthDate String
+  preferredTime    String
+  status           String   @default("PENDING") // PENDING, SCHEDULED, CANCELED
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+}
