@@ -1,6 +1,5 @@
-// app/api/dashboard/stats/route.ts
 import { NextResponse } from 'next/server';
-import { PrismaClient, LeadStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth';
 
 const prisma = new PrismaClient();
@@ -15,40 +14,40 @@ export async function GET() {
   const userId = session.user.id;
 
   try {
-    // Busca todos os leads do usuário logado
-    const leads = await prisma.lead.findMany({
-      where: { userId: userId },
+    // 1. Buscar totais gerais
+    const totalLeads = await prisma.lead.count({ where: { userId } });
+    
+    // 2. Buscar leads por Segmentação (Tiers)
+    const leadsPequenos = await prisma.lead.count({ where: { userId, segmentacao: 'PEQUENO' } });
+    const leadsMedios = await prisma.lead.count({ where: { userId, segmentacao: 'MEDIO' } });
+    const leadsGrandes = await prisma.lead.count({ where: { userId, segmentacao: 'GRANDE' } });
+
+    // 3. Buscar Agendamentos Pendentes (Tier 3 e 4)
+    const agendamentosPendentes = await prisma.agendamento.count({
+      where: { 
+        userId, 
+        status: 'PENDENTE' 
+      }
     });
 
-    // Calcula as estatísticas
-    const totalLeads = leads.length;
-    const leadsQualificados = leads.filter(
-      (lead) => lead.status === LeadStatus.QUALIFICADO || lead.status === LeadStatus.ATENDIDO || lead.status === LeadStatus.VENDA_REALIZADA
-    ).length;
-    const leadsAtendidos = leads.filter(
-      (lead) => lead.status === LeadStatus.ATENDIDO || lead.status === LeadStatus.VENDA_REALIZADA
-    ).length;
-    const vendasRealizadas = leads.filter(
-      (lead) => lead.status === LeadStatus.VENDA_REALIZADA
-    ).length;
-
-    // Calcula a conversão
+    // 4. Calcular vendas (já existente)
+    const vendasRealizadas = await prisma.lead.count({ where: { userId, status: 'VENDA_REALIZADA' } });
     const conversao = totalLeads > 0 ? (vendasRealizadas / totalLeads) * 100 : 0;
 
-    const stats = {
+    return NextResponse.json({
       totalLeads,
-      leadsQualificados,
-      leadsAtendidos,
+      segmentacao: {
+        pequeno: leadsPequenos,
+        medio: leadsMedios,
+        grande: leadsGrandes
+      },
+      agendamentosPendentes,
       vendasRealizadas,
       conversao: `${conversao.toFixed(1)}%`,
-    };
+    });
 
-    return NextResponse.json(stats);
   } catch (error) {
-    console.error("Erro ao buscar estatísticas:", error);
-    return NextResponse.json(
-      { error: 'Ocorreu um erro ao buscar as estatísticas.' },
-      { status: 500 }
-    );
+    console.error("Erro stats:", error);
+    return NextResponse.json({ error: 'Erro ao buscar estatísticas.' }, { status: 500 });
   }
 }

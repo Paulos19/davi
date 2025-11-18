@@ -1,6 +1,7 @@
-// app/(dashboard)/dashboard/page.tsx
+import { getDashboardOverview } from '@/lib/data'; // Vamos manter a importação, mas usar fetch no client ou atualizar a lib se preferir Server Component puro. 
+// Para simplificar e usar os dados atualizados da API que acabamos de criar, vamos transformar em Client Component ou fazer o fetch direto aqui se for Server Component.
+// MANTENDO SERVER COMPONENT (Ideal do Next.js):
 
-import { getDashboardOverview } from '@/lib/data';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,113 +9,160 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Percent, ArrowRight } from 'lucide-react';
+import { ArrowRight, Calendar, DollarSign, Users, TrendingUp } from 'lucide-react';
 import { AnimatedBorderCard } from '@/components/ui/animated-border-card';
+import { PrismaClient } from '@prisma/client';
 
-// Certifique-se de que o componente Avatar foi adicionado ao seu projeto:
-// npx shadcn-ui@latest add avatar
+const prisma = new PrismaClient();
+
+// Função auxiliar para buscar dados (Server-side)
+async function getData(userId: string) {
+  const totalLeads = await prisma.lead.count({ where: { userId } });
+  const leadsVip = await prisma.lead.count({ where: { userId, segmentacao: 'GRANDE' } });
+  const leadsMedio = await prisma.lead.count({ where: { userId, segmentacao: 'MEDIO' } });
+  
+  const agendamentos = await prisma.agendamento.count({ 
+    where: { userId, status: 'PENDENTE' } 
+  });
+
+  // Próximos agendamentos para a lista
+  const nextAppointments = await prisma.agendamento.findMany({
+    where: { userId, status: 'PENDENTE' },
+    include: { lead: true },
+    orderBy: { dataHora: 'asc' },
+    take: 3
+  });
+
+  return {
+    stats: { totalLeads, leadsVip, leadsMedio, agendamentos },
+    nextAppointments
+  };
+}
 
 export default async function DashboardPage() {
   const session = await auth();
-  if (!session?.user?.id) {
-    redirect('/login');
-  }
+  if (!session?.user?.id) redirect('/login');
 
-  // Busca os dados de visão geral diretamente do servidor
-  const { stats, recentLeads } = await getDashboardOverview(session.user.id);
+  const { stats, nextAppointments } = await getData(session.user.id);
 
   return (
     <div className="space-y-8">
-      {/* Secção de Métricas Principais */}
+      <div className="flex items-center justify-between">
+         <h2 className="text-3xl font-bold tracking-tight">Visão Geral</h2>
+      </div>
+
+      {/* --- CARDS DE KPI (FOCADOS EM QUALIDADE) --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Card 1: Agenda (Prioridade Máxima) */}
         <AnimatedBorderCard
-          title="Leads Entrantes"
-          value={stats.totalLeads}
-          description="Total de contatos iniciados"
-          iconName="Users" // Passando o nome do ícone como string
-          href="/dashboard/leads"
+          title="Reuniões Pendentes"
+          value={stats.agendamentos}
+          description="Agendamentos confirmados pela IA"
+          iconName="Calendar"
+          href="/dashboard/agenda" // Futura página de agenda
         />
+        
+        {/* Card 2: Pipeline VIP (Tier 4) */}
         <AnimatedBorderCard
-          title="Leads Qualificados"
-          value={stats.leadsQualificados}
-          description="Leads que completaram o fluxo"
-          iconName="CheckCircle" // Passando o nome do ícone como string
-          href="/dashboard/leads?status=QUALIFICADO"
+          title="Leads VIP (>100k)"
+          value={stats.leadsVip}
+          description="Requer atenção do Rodrigo"
+          iconName="DollarSign"
+          href="/dashboard/leads?segmentacao=GRANDE"
         />
-        <AnimatedBorderCard
-          title="Vendas Realizadas"
-          value={stats.vendasRealizadas}
-          description="Conversões bem-sucedidas"
-          iconName="DollarSign" // Passando o nome do ícone como string
-          href="/dashboard/leads?status=VENDA_REALIZADA"
-        />
+
+        {/* Card 3: Pipeline Médio (Tier 3) */}
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
-                <Percent className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{stats.conversao}</div>
-                <p className="text-xs text-muted-foreground">De lead entrante para venda</p>
-            </CardContent>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Gestão (30k-100k)</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.leadsMedio}</div>
+            <p className="text-xs text-muted-foreground">Potenciais clientes de consultoria</p>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Total */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalLeads}</div>
+            <p className="text-xs text-muted-foreground">Volume total capturado</p>
+          </CardContent>
         </Card>
       </div>
 
-      {/* Secção de Atalhos e Leads Recentes */}
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-        {/* Card de Leads Recentes */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Leads Recentes</CardTitle>
-              <CardDescription>
-                Os últimos 5 leads que entraram em contato.
-              </CardDescription>
-            </div>
-            <Button asChild size="sm">
-              <Link href="/dashboard/leads">
-                Ver todos <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+      {/* --- SEÇÃO DE AGENDA E ATALHOS --- */}
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">
+        
+        {/* Lista de Próximas Reuniões (Ocupa 4 colunas) */}
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Próximas Reuniões</CardTitle>
+            <CardDescription>
+              Agendamentos realizados pela IA aguardando atendimento.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentLeads.length > 0 ? (
-                recentLeads.map((lead) => (
-                  <div key={lead.id} className="flex items-center">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback>{lead.nome.charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
+            <div className="space-y-8">
+              {nextAppointments.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Nenhuma reunião agendada.</p>
+              ) : (
+                nextAppointments.map((apt) => (
+                  <div key={apt.id} className="flex items-center">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                      {new Date(apt.dataHora).getDate()}
+                    </div>
                     <div className="ml-4 space-y-1">
-                      <p className="text-sm font-medium leading-none">{lead.nome}</p>
-                      <p className="text-sm text-muted-foreground">{lead.contato}</p>
+                      <p className="text-sm font-medium leading-none">
+                        {apt.lead.nome} 
+                        <Badge variant={apt.tipo === 'BPO_PREMIUM' ? 'default' : 'secondary'} className="ml-2 text-[10px]">
+                           {apt.tipo === 'BPO_PREMIUM' ? 'VIP' : 'GESTÃO'}
+                        </Badge>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(apt.dataHora).toLocaleString('pt-BR', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     </div>
                     <div className="ml-auto font-medium">
-                      <Badge variant="outline">{lead.status.replace('_', ' ')}</Badge>
+                        <Link href={`/dashboard/leads/${apt.leadId}`}>
+                            <Button size="sm" variant="outline">Ver Lead</Button>
+                        </Link>
                     </div>
                   </div>
                 ))
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Ainda não há leads recentes.
-                </p>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Card de Atalhos */}
-        <Card>
+        {/* Atalhos Rápidos (Ocupa 3 colunas) */}
+        <Card className="col-span-3">
           <CardHeader>
-            <CardTitle>Atalhos</CardTitle>
-            <CardDescription>Aceda rapidamente às principais áreas.</CardDescription>
+            <CardTitle>Ações Rápidas</CardTitle>
+            <CardDescription>Gerencie sua operação.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <Link href="/dashboard/analytics" className="w-full">
-                <Button variant="outline" className="w-full justify-start">Ver Análises</Button>
+            <Link href="/dashboard/leads?segmentacao=PEQUENO">
+                <Button variant="outline" className="w-full justify-between">
+                    <span>Ver Vendas de Produtos</span>
+                    <span className="text-xs bg-muted px-2 py-1 rounded">Tier 2</span>
+                </Button>
             </Link>
-            <Link href="/dashboard/export" className="w-full">
-                <Button variant="outline" className="w-full justify-start">Exportar Dados</Button>
+            <Link href="/dashboard/analytics">
+                <Button variant="outline" className="w-full justify-between">
+                    <span>Análise de Segmentação</span>
+                    <TrendingUp className="h-4 w-4" />
+                </Button>
+            </Link>
+            <Link href="/dashboard/export">
+                <Button variant="secondary" className="w-full">
+                    Exportar Relatório Completo
+                </Button>
             </Link>
           </CardContent>
         </Card>

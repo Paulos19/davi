@@ -14,12 +14,16 @@ model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  password  String // Armazenaremos o hash da senha, não a senha em texto plano
-  phone     String   @unique // Identificador para receber atualizações do n8n
+  password  String
+  phone     String   @unique // O n8n usará isso para match
+  
+  // NOVOS CAMPOS
+  onboardingCompleted Boolean @default(false)
+  qualificationConfig Json?   // Ex: { questions: ["Nome?", "Empresa?", "Cargo?"] }
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relação: Um usuário pode ter muitos leads
   leads        Lead[]
   agendamentos Agendamento[]
 }
@@ -27,17 +31,20 @@ model User {
 model Lead {
   id      String     @id @default(cuid())
   status  LeadStatus @default(ENTRANTE)
-  nome    String
+  nome    String     // Mantemos nome como base
   contato String     @unique
 
+  // CAMPOS ANTIGOS (Você pode manter como legado ou opcionais)
   produtoDeInteresse   String?
   necessidadePrincipal String?
   orcamento            String?
   prazo                String?
   classificacao        String?
-
-  faturamentoEstimado String?
+  faturamentoEstimado  String?
   segmentacao         String?
+
+  // NOVO CAMPO DINÂMICO
+  dynamicData       Json?   // Ex: { "Pergunta 1": "Resposta", "Pergunta 2": "Resposta" }
 
   resumoDaConversa  String? @db.Text
   historicoCompleto Json?
@@ -45,7 +52,6 @@ model Lead {
   atividadePrincipal String?
   vendaRealizada     Boolean @default(false)
   valorVenda         Float?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
