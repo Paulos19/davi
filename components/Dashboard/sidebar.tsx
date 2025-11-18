@@ -6,13 +6,14 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
-import { LayoutDashboard, Users, BarChart, Download, ChevronsLeft, ChevronsRight, BotMessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart, Download, ChevronsLeft, ChevronsRight, BotMessageSquare, Settings } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Início' },
   { href: '/dashboard/leads', icon: Users, label: 'Leads' },
   { href: '/dashboard/analytics', icon: BarChart, label: 'Análises' },
+  { href: '/dashboard/settings', icon: Settings, label: 'Configurações' },
   { href: '/dashboard/export', icon: Download, label: 'Exportar Dados' },
 ];
 

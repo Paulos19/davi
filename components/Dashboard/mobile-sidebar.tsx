@@ -3,13 +3,14 @@
 
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '../ui/button';
-import { Menu, LayoutDashboard, Users, BarChart, Download } from 'lucide-react';
+import { Menu, LayoutDashboard, Users, BarChart, Download, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Início' },
   { href: '/dashboard/leads', icon: Users, label: 'Leads' },
   { href: '/dashboard/analytics', icon: BarChart, label: 'Análises' },
+  { href: '/dashboard/settings', icon: Settings, label: 'Configurações' },
   { href: '/dashboard/export', icon: Download, label: 'Exportar Dados' },
 ];
 
