@@ -2,10 +2,10 @@
 
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { normalizePhoneNumber } from '@/lib/phoneUtils'; // Importe a função que criamos
+import { normalizePhoneNumber } from '@/lib/phoneUtils';
 
 const prisma = new PrismaClient();
-const N8N_API_KEY = process.env.N8N_INTERNAL_API_KEY;
+const N8N_API_KEY = process.env.N8N_INTERNAL_API_KEY; 
 
 type Context = {
   params: {
@@ -14,47 +14,49 @@ type Context = {
 };
 
 export async function GET(request: Request, context: Context) {
+  // 1. Validação de Segurança (Chave n8n)
   const apiKey = request.headers.get('x-api-key');
   if (apiKey !== N8N_API_KEY) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  const { phone } = context.params; // Vem do n8n, ex: 5511999998888 (pode vir com ou sem 9)
+  const { phone } = context.params;
 
   if (!phone) {
     return NextResponse.json({ error: 'Telefone obrigatório' }, { status: 400 });
   }
 
   try {
-    // 1. Normaliza o telefone que veio do n8n
     const incomingNormalized = normalizePhoneNumber(phone);
 
-    // 2. Busca TODOS os usuários (ou otimizar com raw query se o banco for muito grande)
-    // Infelizmente, o Prisma não tem "where function(column) = value", então precisamos buscar e filtrar
-    // Como é um sistema de especialistas, não deve haver milhões, então filtrar em memória é ok por enquanto.
+    // 2. Busca o usuário com as configurações necessárias
     const users = await prisma.user.findMany({
       select: {
         id: true,
         name: true,
         phone: true,
-        qualificationConfig: true // IMPORTANTE: Retornar as perguntas
+        qualificationConfig: true,
+        ragKnowledgeBaseCondensed: true // Busca o campo condensado pela IA
       }
     });
 
-    // 3. Encontra o especialista comparando normalizações
     const specialist = users.find(u => normalizePhoneNumber(u.phone) === incomingNormalized);
 
     if (specialist) {
+      // Tenta pegar o valor do campo condensado (chave: condensed_knowledge)
+      const condensedRAG = (specialist.ragKnowledgeBaseCondensed as any)?.condensed_knowledge || '';
+
       return NextResponse.json({
         isSpecialist: true,
         specialist: {
           id: specialist.id,
           name: specialist.name,
-          // Retorna as perguntas configuradas OU um padrão se não tiver
+          // Retorna as perguntas configuradas (fallback se vazio)
           questions: (specialist.qualificationConfig as any)?.questions || [
             "Qual o seu nome?",
             "Qual o faturamento mensal da sua empresa?"
-          ]
+          ],
+          ragKnowledge: condensedRAG // O prompt final condensado para o n8n
         }
       });
     } else {
