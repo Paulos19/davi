@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image'; // Importar Image do Next.js
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
@@ -35,48 +35,55 @@ export function Sidebar() {
     >
       {/* Header da Sidebar com Logo */}
       <div className="h-20 flex items-center justify-between px-4 border-b border-border/50">
-        <div className="flex items-center gap-3 overflow-hidden w-full">
+        <div className="flex items-center gap-3 overflow-hidden w-full justify-center">
           <AnimatePresence mode="wait">
             {!isCollapsed ? (
               <motion.div
+                key="full-logo"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="relative w-32 h-10" // Ajuste as dimensões conforme a proporção da sua logo
+                className="relative"
               >
+                {/* CORREÇÃO AQUI: width/height + unoptimized */}
                 <Image 
                   src="/davi_logo.png" 
                   alt="Davi Logo" 
-                  fill
-                  className="object-contain object-left"
+                  width={120}
+                  height={40}
+                  className="object-contain"
                   priority
+                  unoptimized // Ignora otimização do servidor para evitar o erro
                 />
               </motion.div>
             ) : (
               <motion.div
+                key="icon-logo"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                className="relative w-8 h-8 mx-auto"
+                className="relative"
               >
-                {/* Versão ícone da logo ou a mesma logo reduzida */}
+                {/* Versão reduzida da logo */}
                 <Image 
                   src="/davi_logo.png" 
                   alt="Davi Icon" 
-                  fill
+                  width={40}
+                  height={40}
                   className="object-contain"
+                  unoptimized
                 />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
         
-        {/* Botão de Colapso (Apenas visível se expandido ou no hover) */}
+        {/* Botão de Colapso */}
         {!isCollapsed && (
             <Button 
             variant="ghost" 
             size="icon" 
-            className="h-6 w-6 text-muted-foreground hover:text-foreground ml-auto" 
+            className="h-6 w-6 text-muted-foreground hover:text-foreground absolute right-2" 
             onClick={() => setIsCollapsed(true)}
             >
             <ChevronLeft className="h-4 w-4" />
@@ -84,7 +91,7 @@ export function Sidebar() {
         )}
       </div>
       
-      {/* Botão de Expandir (Quando colapsado) */}
+      {/* Botão de Expandir */}
       {isCollapsed && (
         <div className="w-full flex justify-center py-2 border-b border-border/50">
              <Button 
@@ -127,7 +134,6 @@ export function Sidebar() {
                     exit={{ opacity: 0, x: -10 }}
                     className={cn(
                         "text-sm font-medium whitespace-nowrap transition-all duration-300",
-                        // AQUI ESTÁ O DEGRADÊ NOS TÍTULOS
                         isActive 
                             ? "bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600 font-bold" 
                             : "text-muted-foreground group-hover:text-foreground"
@@ -142,7 +148,7 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* Card de Upgrade (Feature Visual) */}
+      {/* Card de Upgrade */}
       <AnimatePresence>
         {!isCollapsed && (
           <motion.div

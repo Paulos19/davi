@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { User } from 'next-auth';
@@ -18,17 +19,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-// --- COMPONENTE: WEATHER WIDGET (O Clima Rico) ---
+// --- COMPONENTE: WEATHER WIDGET ---
 function WeatherWidget() {
   const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Busca localização ou usa padrão (SP)
     const fetchWeather = async (lat: number, lon: number) => {
       try {
         const res = await fetch(
@@ -61,7 +60,6 @@ function WeatherWidget() {
   const daily = weather.daily;
   const isDay = current.is_day === 1;
 
-  // Mapeamento de Ícone e Descrição
   const getWeatherIcon = (code: number) => {
     if (code === 0) return isDay ? <Sun className="h-8 w-8 text-yellow-400 animate-spin-slow" /> : <Moon className="h-8 w-8 text-slate-200" />;
     if (code >= 1 && code <= 3) return <CloudSun className="h-8 w-8 text-orange-300" />;
@@ -84,7 +82,6 @@ function WeatherWidget() {
         ? "bg-gradient-to-br from-sky-100 via-blue-50 to-white border-blue-100 text-blue-900" 
         : "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border-indigo-900 text-slate-100"
     )}>
-      {/* Esquerda: Ícone Principal + Temperatura */}
       <div className="flex items-center gap-3 pr-3 border-r border-black/5 dark:border-white/10">
         <div className="filter drop-shadow-md">
            {getWeatherIcon(current.weather_code)}
@@ -99,28 +96,19 @@ function WeatherWidget() {
         </div>
       </div>
 
-      {/* Direita: Grid de Detalhes (Umidade, Chuva, Vento) */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-medium opacity-90">
-        
-        {/* Chance de Chuva */}
         <div className="flex items-center gap-1.5" title="Chance de Chuva Hoje">
           <Umbrella className="h-3 w-3 text-blue-500" />
           <span>{daily.precipitation_probability_max[0]}%</span>
         </div>
-
-        {/* Umidade */}
         <div className="flex items-center gap-1.5" title="Umidade Relativa">
           <Droplets className="h-3 w-3 text-cyan-500" />
           <span>{current.relative_humidity_2m}%</span>
         </div>
-
-        {/* Vento */}
         <div className="flex items-center gap-1.5" title="Velocidade do Vento">
           <Wind className="h-3 w-3 text-slate-500 dark:text-slate-400" />
           <span>{Math.round(current.wind_speed_10m)} km/h</span>
         </div>
-
-        {/* Min/Max */}
         <div className="flex items-center gap-1.5" title="Mínima e Máxima">
           <span className="text-blue-600 dark:text-blue-300">↓{Math.round(daily.temperature_2m_min[0])}°</span>
           <span className="text-red-500 dark:text-red-300">↑{Math.round(daily.temperature_2m_max[0])}°</span>
@@ -130,22 +118,7 @@ function WeatherWidget() {
   );
 }
 
-// --- FIM WEATHER WIDGET ---
-
-interface HeaderProps {
-  user: User | undefined;
-}
-
-// Interfaces para Notificações
-interface Notification {
-  id: string;
-  title: string;
-  description: string;
-  time: string;
-  type: 'lead' | 'agenda' | 'system';
-  read: boolean;
-}
-
+// --- RELÓGIO DE BRASÍLIA ---
 function BrasiliaClock() {
   const [time, setTime] = useState<string>('');
 
@@ -172,10 +145,36 @@ function BrasiliaClock() {
   );
 }
 
+// --- COMPONENTE PRINCIPAL ---
+interface HeaderProps {
+  user: User | undefined;
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  type: 'lead' | 'agenda' | 'system';
+  read: boolean;
+}
+
 export default function Header({ user }: HeaderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [hasNew, setHasNew] = useState(false);
   const lastStatsRef = useRef<{ leads: number; appointments: number } | null>(null);
+  
+  // Estado para busca funcional
+  const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
+
+  // Função de busca
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/dashboard/leads?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
 
   useEffect(() => {
     const checkUpdates = async () => {
@@ -254,29 +253,24 @@ export default function Header({ user }: HeaderProps) {
         <MobileSidebar />
       </div>
       
-      {/* Barra de Pesquisa */}
+      {/* Barra de Pesquisa Funcional */}
       <div className="flex-1 flex items-center max-w-md gap-4">
-        <div className="relative w-full hidden md:flex items-center group">
+        <form onSubmit={handleSearch} className="relative w-full hidden md:flex items-center group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
-            placeholder="Buscar (⌘K)..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar leads (Enter)..." 
             className="pl-9 h-10 bg-muted/40 border-transparent focus:border-primary/20 focus:bg-background rounded-xl transition-all"
           />
-        </div>
+        </form>
       </div>
 
       <div className="flex items-center gap-4">
-        
-        {/* --- NOVO: WIDGET DE CLIMA RICO --- */}
         <WeatherWidget />
-
-        {/* Separador Visual */}
         <div className="h-8 w-px bg-border/60 hidden lg:block" />
-
-        {/* Relógio Simples */}
         <BrasiliaClock />
 
-        {/* Notificações */}
         <Popover onOpenChange={(open) => open && markAsRead()}>
           <PopoverTrigger asChild>
             <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-muted/80">
@@ -290,12 +284,7 @@ export default function Header({ user }: HeaderProps) {
             <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
               <h4 className="font-semibold text-sm">Notificações</h4>
               {notifications.length > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-auto px-2 py-0.5 text-xs text-muted-foreground hover:text-destructive"
-                  onClick={clearNotifications}
-                >
+                <Button variant="ghost" size="sm" onClick={clearNotifications} className="h-auto px-2 py-0.5 text-xs text-muted-foreground hover:text-destructive">
                   Limpar
                 </Button>
               )}
@@ -309,21 +298,14 @@ export default function Header({ user }: HeaderProps) {
               ) : (
                 <div className="flex flex-col">
                   {notifications.map((notif) => (
-                    <div 
-                      key={notif.id} 
-                      className={processNotificationStyle(notif.type, notif.read)}
-                    >
-                      <div className="mt-1">
-                        {getNotificationIcon(notif.type)}
-                      </div>
+                    <div key={notif.id} className={processNotificationStyle(notif.type, notif.read)}>
+                      <div className="mt-1">{getNotificationIcon(notif.type)}</div>
                       <div className="flex-1 space-y-1">
                         <p className="text-sm font-medium leading-none">{notif.title}</p>
                         <p className="text-xs text-muted-foreground">{notif.description}</p>
                         <p className="text-[10px] text-muted-foreground/70">{notif.time}</p>
                       </div>
-                      {!notif.read && (
-                        <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                      )}
+                      {!notif.read && <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />}
                     </div>
                   ))}
                 </div>
@@ -332,7 +314,6 @@ export default function Header({ user }: HeaderProps) {
           </PopoverContent>
         </Popover>
 
-        {/* User Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="pl-2 pr-1 h-10 rounded-full gap-2 hover:bg-muted/60 transition-all border border-transparent hover:border-border/50">
@@ -349,7 +330,6 @@ export default function Header({ user }: HeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 p-2 shadow-xl border-border/50">
-             {/* ... Itens do Menu (Mantidos) ... */}
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{user?.name}</p>
@@ -361,7 +341,7 @@ export default function Header({ user }: HeaderProps) {
               <UserIcon className="h-4 w-4" /> Perfil
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer gap-2 text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => signOut({ callbackUrl: '/login' })}>
+            <DropdownMenuItem className="cursor-pointer gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50" onClick={() => signOut({ callbackUrl: '/login' })}>
               <LogOut className="h-4 w-4" /> Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -371,7 +351,6 @@ export default function Header({ user }: HeaderProps) {
   );
 }
 
-// Helpers (Mantidos)
 function getNotificationIcon(type: string) {
   switch (type) {
     case 'lead': return <UserIcon className="h-4 w-4 text-blue-500" />;
