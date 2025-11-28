@@ -1,10 +1,11 @@
-// app/(dashboard)/layout.tsx
-
 import Header from "@/components/Dashboard/header";
 import { Sidebar } from "@/components/Dashboard/sidebar";
 import { auth } from "@/lib/auth";
 import { PrismaClient } from "@prisma/client";
-import { OnboardingModal } from "@/components/Dashboard/OnboardingModal"; // Importe o modal
+import { OnboardingModal } from "@/components/Dashboard/OnboardingModal";
+
+// CORREÇÃO: Força renderização dinâmica para evitar conflitos de headers estáticos/dinâmicos
+export const dynamic = 'force-dynamic';
 
 const prisma = new PrismaClient();
 
@@ -15,14 +16,12 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   
-  // Busca o status atualizado do onboarding
   let showOnboarding = false;
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { onboardingCompleted: true }
     });
-    // Se onboardingCompleted for false, mostramos o modal
     showOnboarding = !user?.onboardingCompleted;
   }
 
@@ -36,7 +35,6 @@ export default async function DashboardLayout({
         </main>
       </div>
       
-      {/* Modal condicional */}
       {showOnboarding && <OnboardingModal isOpen={true} />}
     </div>
   );
