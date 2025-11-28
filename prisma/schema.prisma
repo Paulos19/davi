@@ -11,29 +11,30 @@ datasource db {
 
 // Novo modelo para o Especialista/Usuário
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  phone     String   @unique // O n8n usará isso para match
-  
+  id       String @id @default(cuid())
+  name     String
+  email    String @unique
+  password String
+  phone    String @unique // O n8n usará isso para match
+
   // NOVOS CAMPOS
-  onboardingCompleted Boolean @default(false)
-  qualificationConfig Json? 
-  ragKnowledgeBaseRaw Json?   // NOVO: Lista de fatos em formato cru (para edição)
+  onboardingCompleted       Boolean @default(false)
+  qualificationConfig       Json?
+  ragKnowledgeBaseRaw       Json? // NOVO: Lista de fatos em formato cru (para edição)
   ragKnowledgeBaseCondensed Json? // NOVO: Prompt condensado pela IA (para o n8n)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  leads        Lead[]
-  agendamentos Agendamento[]
+  leads             Lead[]
+  agendamentos      Agendamento[]
+  availabilitySlots AvailabilitySlot[]
 }
 
 model Lead {
   id      String     @id @default(cuid())
   status  LeadStatus @default(ENTRANTE)
-  nome    String     // Mantemos nome como base
+  nome    String // Mantemos nome como base
   contato String     @unique
 
   // CAMPOS ANTIGOS (Você pode manter como legado ou opcionais)
@@ -43,19 +44,19 @@ model Lead {
   prazo                String?
   classificacao        String?
   faturamentoEstimado  String?
-  segmentacao         String?
+  segmentacao          String?
 
   // NOVO CAMPO DINÂMICO
-  dynamicData       Json?   // Ex: { "Pergunta 1": "Resposta", "Pergunta 2": "Resposta" }
+  dynamicData Json? // Ex: { "Pergunta 1": "Resposta", "Pergunta 2": "Resposta" }
 
   resumoDaConversa  String? @db.Text
   historicoCompleto Json?
 
   atividadePrincipal String?
-  vendaRealizada     Boolean @default(false)
+  vendaRealizada     Boolean  @default(false)
   valorVenda         Float?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   userId      String
   user        User         @relation(fields: [userId], references: [id])
@@ -97,4 +98,21 @@ model WaitListEntry {
   createdAt        DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model AvailabilitySlot {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  startTime DateTime
+  endTime   DateTime
+  isBooked  Boolean  @default(false)
+
+  // Se quiser saber qual lead agendou (opcional, pois já tem a tabela Agendamento)
+  leadId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startTime])
 }
