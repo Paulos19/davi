@@ -1,9 +1,8 @@
-// app/(dashboard)/dashboard/settings/page.tsx
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; 
-import { RAGKnowledgeBase } from './components/rag-knowledge-base'; // Importa o novo componente RAG (CRIAR ESTE ARQUIVO)
-// Importar os componentes necessários para QualificationSettings
+import { RAGKnowledgeBase } from './components/rag-knowledge-base';
+import { ClassificationRules } from './components/classification-rules'; // Importe o novo componente
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import { Plus, Trash2, Save, Loader2, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 
-// Componente Auxiliar para as configurações de Qualificação (Mantido para organização)
+// Componente Auxiliar para as configurações de Qualificação (Mantido para brevidade, mas deve estar presente)
 function QualificationSettings() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,7 +85,7 @@ function QualificationSettings() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full min-h-[500px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="flex items-center justify-center h-[200px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -102,7 +101,6 @@ function QualificationSettings() {
       </CardHeader>
       <Separator />
       <CardContent className="space-y-6 pt-6">
-        
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="text-base">Lista de Perguntas</Label>
@@ -117,7 +115,6 @@ function QualificationSettings() {
                 <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-medium border">
                   {index + 1}
                 </div>
-                {/* Usar Input padrão (simulando input from ui/input) */}
                 <input
                   type="text"
                   value={q} 
@@ -151,27 +148,32 @@ function QualificationSettings() {
   );
 }
 
-// Página principal com as abas
+// Página principal com as abas atualizadas
 export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto py-6 space-y-8">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Configurações do Assistente Davi</h2>
-        <p className="text-muted-foreground">Gerencie o comportamento e a base de conhecimento do seu assistente virtual.</p>
+        <p className="text-muted-foreground">Gerencie o comportamento, regras de negócio e base de conhecimento.</p>
       </div>
       
-      {/* Implementação das Abas */}
       <Tabs defaultValue="qualification">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="qualification">Perguntas Iniciais</TabsTrigger>
+          <TabsTrigger value="classification">Regras de Classificação</TabsTrigger> {/* Nova Aba */}
           <TabsTrigger value="knowledge">Base de Conhecimento (RAG)</TabsTrigger>
         </TabsList>
-        <div className="mt-4">
+        
+        <div className="mt-6">
           <TabsContent value="qualification">
             <QualificationSettings />
           </TabsContent>
+          
+          <TabsContent value="classification">
+            <ClassificationRules /> {/* Novo Componente */}
+          </TabsContent>
+          
           <TabsContent value="knowledge">
-            {/* O componente RAGKnowledgeBase deve ser criado e importado */}
             <RAGKnowledgeBase />
           </TabsContent>
         </div>

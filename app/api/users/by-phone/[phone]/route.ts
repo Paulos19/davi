@@ -1,5 +1,3 @@
-// app/api/users/by-phone/[phone]/route.ts
-
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { normalizePhoneNumber } from '@/lib/phoneUtils';
@@ -29,22 +27,31 @@ export async function GET(request: Request, context: Context) {
   try {
     const incomingNormalized = normalizePhoneNumber(phone);
 
-    // 2. Busca o usuário com as configurações necessárias
+    // 2. Busca o usuário com todas as configurações
     const users = await prisma.user.findMany({
       select: {
         id: true,
         name: true,
         phone: true,
         qualificationConfig: true,
-        ragKnowledgeBaseCondensed: true // Busca o campo condensado pela IA
+        classificationConfig: true, // Campo novo
+        ragKnowledgeBaseCondensed: true 
       }
     });
 
     const specialist = users.find(u => normalizePhoneNumber(u.phone) === incomingNormalized);
 
     if (specialist) {
-      // Tenta pegar o valor do campo condensado (chave: condensed_knowledge)
+      // Tenta pegar o valor do campo condensado
       const condensedRAG = (specialist.ragKnowledgeBaseCondensed as any)?.condensed_knowledge || '';
+
+      // Tenta pegar as regras de classificação (com fallback seguro)
+      const classificationRules = (specialist.classificationConfig as any) || {
+          tier1: "Faturamento < 1.000 ou estudante/curioso.",
+          tier2: "Faturamento entre 1.000 e 30.000 (Interesse em produtos digitais).",
+          tier3: "Faturamento entre 30.000 e 100.000 (Consultoria).",
+          tier4: "Faturamento > 100.000 (BPO Premium)."
+      };
 
       return NextResponse.json({
         isSpecialist: true,
@@ -56,7 +63,8 @@ export async function GET(request: Request, context: Context) {
             "Qual o seu nome?",
             "Qual o faturamento mensal da sua empresa?"
           ],
-          ragKnowledge: condensedRAG // O prompt final condensado para o n8n
+          ragKnowledge: condensedRAG,
+          classificationRules: classificationRules // <--- ENVIADO PARA O N8N
         }
       });
     } else {
