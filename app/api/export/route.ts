@@ -1,3 +1,5 @@
+// app/api/export/route.ts
+
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth';
@@ -6,114 +8,85 @@ import * as xlsx from 'xlsx';
 
 const prisma = new PrismaClient();
 
-// Mapa para formatar os campos corretamente
-const FIELD_MAP: Record<string, (lead: any) => any> = {
-  'id': (l) => l.id,
-  'name': (l) => l.nome,
-  'phone': (l) => l.contato,
-  'email': (l) => 'N/A', // Ajuste se tiver campo de email
-  'status': (l) => l.status,
-  'segmentacao': (l) => l.segmentacao,
-  'atividadePrincipal': (l) => l.atividadePrincipal,
-  'produtoDeInteresse': (l) => l.produtoDeInteresse,
-  'createdAt': (l) => new Date(l.createdAt).toLocaleDateString('pt-BR'),
-  'agendamento': (l) => l.agendamento ? new Date(l.agendamento.dataHora).toLocaleString('pt-BR') : 'Não',
-  'valorVenda': (l) => l.valorVenda ? `R$ ${l.valorVenda}` : '-',
-  'lastMessage': (l) => {
-    // Pega a última mensagem do histórico, se houver
-    if (Array.isArray(l.historicoCompleto) && l.historicoCompleto.length > 0) {
-      return l.historicoCompleto[l.historicoCompleto.length - 1].content;
-    }
-    return '-';
-  }
-};
-
-// IMPORTANTE: Exportar a função com o nome POST
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   const session = await auth();
-  
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
+  // Pega o parâmetro de formato da URL
+  const { searchParams } = new URL(request.url);
+  const format = searchParams.get('format') || 'csv'; // CSV como padrão
+
   try {
-    const { startDate, endDate, fields, format } = await request.json();
-
-    // 1. Construir filtros
-    const whereClause: any = {
-      userId: session.user.id,
-    };
-
-    if (startDate && endDate) {
-      // Ajusta o endDate para o final do dia (23:59:59)
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      
-      whereClause.createdAt = {
-        gte: new Date(startDate),
-        lte: end,
-      };
-    }
-
-    // 2. Buscar dados no banco
     const leads = await prisma.lead.findMany({
-      where: whereClause,
-      include: {
-        agendamento: true, // Inclui dados de agendamento para exportar
-      },
-      orderBy: { createdAt: 'desc' },
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'asc' },
     });
 
     if (leads.length === 0) {
-      return NextResponse.json({ error: 'Nenhum dado encontrado para o período selecionado.' }, { status: 404 });
+      return new Response("Nenhum lead para exportar.", { status: 204 }); // 204 No Content
     }
+    
+    // Formata os dados para garantir que tudo seja texto e legível
+    const formattedLeads = leads.map(lead => ({
+      ID: lead.id,
+      Status: lead.status,
+      Nome: lead.nome,
+      Contato: lead.contato,
+      'Produto de Interesse': lead.produtoDeInteresse,
+      'Necessidade Principal': lead.necessidadePrincipal,
+      Orcamento: lead.orcamento,
+      Prazo: lead.prazo,
+      'Classificação (IA)': lead.classificacao,
+      'Faturamento Estimado': lead.faturamentoEstimado,
+      'Atividade Principal': lead.atividadePrincipal,
+      'Venda Realizada': lead.vendaRealizada ? 'Sim' : 'Não',
+      'Valor da Venda': lead.valorVenda,
+      'Data de Criação': lead.createdAt.toISOString(),
+      'Última Atualização': lead.updatedAt.toISOString(),
+      'Resumo da Conversa': lead.resumoDaConversa,
+      'Histórico Completo': JSON.stringify(lead.historicoCompleto, null, 2), // Stringify para legibilidade
+    }));
 
-    // 3. Processar dados (Selecionar apenas colunas pedidas)
-    const processedData = leads.map(lead => {
-      const row: Record<string, any> = {};
-      fields.forEach((fieldKey: string) => {
-        // Usa o mapa se existir função de formatação, senão pega direto
-        const mapper = FIELD_MAP[fieldKey];
-        if (mapper) {
-          row[fieldKey] = mapper(lead);
-        } else {
-          // @ts-ignore
-          row[fieldKey] = lead[fieldKey] || '';
-        }
-      });
-      return row;
-    });
+    const filename = `leads_davi_${new Date().toISOString().split('T')[0]}`;
 
-    const filename = `leads_export_${new Date().toISOString().split('T')[0]}`;
-
-    // 4. Gerar e Retornar Arquivo
     if (format === 'xlsx') {
-      const worksheet = xlsx.utils.json_to_sheet(processedData);
+      // Lógica para gerar XLSX
+      const worksheet = xlsx.utils.json_to_sheet(formattedLeads);
+      
+      // Ajuste automático da largura das colunas para melhor formatação
+      const colWidths = Object.keys(formattedLeads[0]).map(key => ({
+        wch: Math.max(key.length, ...formattedLeads.map(row => row[key as keyof typeof row]?.toString().length ?? 0))
+      }));
+      worksheet['!cols'] = colWidths;
+
       const workbook = xlsx.utils.book_new();
       xlsx.utils.book_append_sheet(workbook, worksheet, 'Leads');
       
       const buffer = xlsx.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 
-      return new Response(buffer, {
-        headers: {
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="${filename}.xlsx"`
-        }
-      });
+      const headers = new Headers();
+      headers.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      headers.set('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+      
+      return new Response(buffer, { headers });
 
     } else {
-      // CSV
-      const csv = Papa.unparse(processedData);
-      return new Response(csv, {
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${filename}.csv"`
-        }
-      });
+      // Lógica para gerar CSV (a que já tínhamos)
+      const csv = Papa.unparse(formattedLeads);
+      const headers = new Headers();
+      headers.set('Content-Type', 'text/csv');
+      headers.set('Content-Disposition', `attachment; filename="${filename}.csv"`);
+      
+      return new Response(csv, { headers });
     }
 
   } catch (error) {
-    console.error("Erro na exportação:", error);
-    return NextResponse.json({ error: 'Falha interna ao processar exportação.' }, { status: 500 });
+    console.error("Erro ao exportar leads:", error);
+    return NextResponse.json(
+      { error: 'Ocorreu um erro ao exportar os dados.' },
+      { status: 500 }
+    );
   }
 }
