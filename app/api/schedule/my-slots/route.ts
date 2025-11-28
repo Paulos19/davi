@@ -1,10 +1,12 @@
+// app/api/schedule/my-slots/route.ts
+
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
-// GET: Lista os slots (Já existente)
+// GET: Lista os slots (Visualização no Dashboard)
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -26,7 +28,7 @@ export async function GET() {
   }
 }
 
-// POST: Cria um slot manualmente (NOVO)
+// POST: Cria um slot manualmente
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -40,10 +42,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 });
     }
 
-    // Combina data e hora para criar o objeto Date (ISO)
-    // Ex: date="2025-11-28", startTime="14:00" -> "2025-11-28T14:00:00"
-    const startDateTime = new Date(`${date}T${startTime}:00`);
-    const endDateTime = new Date(`${date}T${endTime}:00`);
+    // CORREÇÃO CRÍTICA DE FUSO: 
+    // Adicionamos o 'Z' no final para forçar o UTC ISO String.
+    // Isso garante que se o usuário digitar "14:00", o banco salva "14:00Z" (e não "17:00Z" ou "11:00Z")
+    
+    // Formato esperado do input: date="2025-11-30", startTime="14:00"
+    // Formato gerado: "2025-11-30T14:00:00Z"
+    const startDateTime = new Date(`${date}T${startTime}:00Z`);
+    const endDateTime = new Date(`${date}T${endTime}:00Z`);
 
     if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
         return NextResponse.json({ error: 'Data inválida' }, { status: 400 });

@@ -1,3 +1,4 @@
+// app/(dashboard)/dashboard/agenda/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -123,9 +124,14 @@ export default function AgendaPage() {
     }
   };
 
-  // Agrupamento por dia
+  // Agrupamento por dia (Formatado em UTC para corresponder ao banco)
   const groupedSlots = slots.reduce((acc, slot) => {
-    const date = new Date(slot.startTime).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+    const date = new Date(slot.startTime).toLocaleDateString('pt-BR', { 
+        weekday: 'long', 
+        day: '2-digit', 
+        month: '2-digit',
+        timeZone: 'UTC' // Força visualização UTC
+    });
     if (!acc[date]) acc[date] = [];
     acc[date].push(slot);
     return acc;
@@ -279,9 +285,18 @@ export default function AgendaPage() {
                             >
                             <div className="flex items-center gap-2 font-mono text-sm">
                                 <Clock className="h-3 w-3 text-muted-foreground" />
-                                {new Date(slot.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                {/* FORÇANDO timeZone: 'UTC' PARA VISUALIZAR CORRETAMENTE */}
+                                {new Date(slot.startTime).toLocaleTimeString('pt-BR', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit', 
+                                    timeZone: 'UTC' 
+                                })}
                                 <span className="text-muted-foreground">-</span>
-                                {new Date(slot.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(slot.endTime).toLocaleTimeString('pt-BR', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit', 
+                                    timeZone: 'UTC' 
+                                })}
                             </div>
                             
                             {slot.isBooked ? (
